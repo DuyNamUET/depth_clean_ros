@@ -14,65 +14,25 @@ using namespace cv;
 
 Mat depth_raw;
 
-void alignedDepthCallback(const sensor_msgs::ImageConstPtr& msg)
+// appl colormap and show on screen
+void showOnScreen(const Mat& img_16uc1, const char name[])
 {
-    try
-    {
-        cv_bridge::CvImagePtr cv_ptr =
-                cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
-        depth_raw = cv_ptr->image;
-        
-        imshow("raw", depth_raw);
-        waitKey(1);
-    }
-    catch(cv_bridge::Exception &e)
-    {
-        ROS_ERROR("%s", msg->encoding.c_str());
-    }
+    Mat show_img = Mat(img_16uc1.size(), CV_8U);
+    img_16uc1.convertTo(show_img, CV_8U, (float)255/65535);
+    applyColorMap(show_img, show_img, COLORMAP_JET);
+    imshow(name, show_img);
+    waitKey(1);
     return;
 }
 
-void depthHist(const Mat& depth, Mat& normalize_depth, int method)
+void alignedDepthCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-    normalize_depth = Mat(depth.size(), CV_16U);
-    int width = depth.cols;
-    int height = depth.rows;
-
-    static uint32_t histogram[0x10000];
-    memset(histogram, 0, sizeof(histogram));
-
-    for(int i = 0; i < height; ++i)
-    {
-        for(int j = 0; j < width; ++j)
-        {
-            ++histogram[depth.at<ushort>(i, j)];
-        }
-    }
-
-    for(int i = 2; i < 0x10000; ++i)
-    {
-        histogram[i] += histogram[i-1];
-    }
-
-    for(int i = 0; i < height; ++i)
-    {
-        for(int j = 0; j < width; ++j)
-        {
-            if(uint16_t d = depth.at<ushort>(i, j))
-            {
-                // int f = histogram[d] * 255 / histogram[0xFFFF];
-                // normalize_depth.at<uchar>(i, j) = static_cast<uchar>(f);
-                normalize_depth.at<ushort>(i, j) = static_cast<ushort>(histogram[d]);
-            }
-            else
-            {
-                normalize_depth.at<ushort>(i, j) = 0;
-            }
-        }
-    }
-
-    // apply the corlormap
-    // applyColorMap(normalize_depth, normalize_depth, method);
+    cv_bridge::CvImagePtr cv_ptr =
+            cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
+    depth_raw = cv_ptr->image;
+    
+    showOnScreen(depth_raw, "raw");
+    return;
 }
 
 sensor_msgs::Image convert2ROSMsg(const Mat& depth_input)
@@ -103,7 +63,7 @@ int main(int argc, char**argv)
     while(nh.ok())
     {
         // create matrix for depth cleaner instance for output
-        Mat cleaned_depth(depth_raw.size(), CV_16U);
+        Mat cleaned_depth(depth_raw.size(), CV_8U);
 
         if (depth_raw.size().height <= 0 || depth_raw.size().width <= 0) {
             ros::spinOnce();
@@ -117,20 +77,17 @@ int main(int argc, char**argv)
         Mat temp, temp2;
 
         Mat small_depthf;
-        // cout << depth_raw.size().height;
 
         resize(cleaned_depth, small_depthf, depth_raw.size(), SCALE_FACTOR, SCALE_FACTOR);
         // Inpaint only the masked "unknown" pixels
         inpaint(small_depthf, (small_depthf == no_depth), temp, 5.0, INPAINT_TELEA);
 
         resize(temp, temp2, cleaned_depth.size());
-        temp.copyTo(cleaned_depth, (cleaned_depth == no_depth));
-
-        depthHist(cleaned_depth, cleaned_depth, COLORMAP_JET);
+        temp2.copyTo(cleaned_depth, (cleaned_depth == no_depth));
 
         clean_depth_pub.publish(convert2ROSMsg(cleaned_depth));
-        imshow("", cleaned_depth);
-        std::cout << cleaned_depth << std::endl;
+        
+        showOnScreen(cleaned_depth, "cleaned");
 
         rate.sleep();
         ros::spinOnce();
