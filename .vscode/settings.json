@@ -2,5 +2,8 @@
     "python.autoComplete.extraPaths": [
         "/home/may8/camera_ws/devel/lib/python2.7/dist-packages",
         "/opt/ros/kinetic/lib/python2.7/dist-packages"
-    ]
+    ],
+    "files.associations": {
+        "iostream": "cpp"
+    }
 }
