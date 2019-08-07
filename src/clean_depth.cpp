@@ -2,19 +2,19 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 
-#include <librealsense2/rs.hpp> // include RealSense Cross Platform API
+// #include <librealsense2/rs.hpp> // include RealSense Cross Platform API
 
 #include <opencv2/opencv.hpp>   // include OpenCV API
 #include <opencv2/rgbd.hpp>     // openCV RGBD Contrib package
 #include <opencv2/highgui/highgui_c.h> // openCV High-level GUI
 
 #define SCALE_FACTOR 1
-#include <iostream>
+
 using namespace cv;
 
-Mat depth_raw;
+cv_bridge::CvImage cv_br;
 
-// appl colormap and show on screen
+// apply colormap and show on screen
 void showOnScreen(const Mat& img_16uc1, const char name[])
 {
     Mat show_img = Mat(img_16uc1.size(), CV_8U);
@@ -29,20 +29,21 @@ void showOnScreen(const Mat& img_16uc1, const char name[])
 // callback from topic and convert Mat openCV
 void alignedDepthCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-    cv_bridge::CvImagePtr cv_ptr =
-            cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
-    depth_raw = cv_ptr->image;
-    
-    showOnScreen(depth_raw, "raw");
+    cv_br = *cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
     return;
 }
 
 // convert Mat openCV to ROS message
-sensor_msgs::Image convert2ROSMsg(const Mat& depth_input)
+sensor_msgs::Image convert2ROSMsg(const Mat& depth_input, const cv_bridge::CvImage cv_img)
 {
     cv_bridge::CvImage out_bridge;
-    // out_bridge.header
+
+    out_bridge.header.frame_id = cv_img.header.frame_id;
+    out_bridge.header.seq = cv_img.header.seq;
+    out_bridge.header.stamp = cv_img.header.stamp;
+
     out_bridge.image = depth_input;
+
     out_bridge.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 
     sensor_msgs::Image msg = *out_bridge.toImageMsg();
@@ -65,6 +66,9 @@ int main(int argc, char**argv)
     ros::Rate rate(30);
     while(nh.ok())
     {
+        // create matrix that subscribe input topic
+        Mat depth_raw = cv_br.image;
+
         // create matrix for depth cleaner instance for output
         Mat cleaned_depth(depth_raw.size(), CV_16U);
 
@@ -84,14 +88,16 @@ int main(int argc, char**argv)
         resize(cleaned_depth, small_depthf, cleaned_depth.size(),
                 SCALE_FACTOR, SCALE_FACTOR); 
 
-        // Inpaint only the masked "unknown" pixels
+        // inpaint only the masked "unknown" pixels
         inpaint(small_depthf, (small_depthf == no_depth), temp, 5.0, INPAINT_TELEA);
 
         resize(temp, temp2, temp.size());
         temp2.copyTo(cleaned_depth, (cleaned_depth == no_depth));
 
-        clean_depth_pub.publish(convert2ROSMsg(cleaned_depth)); // publish topic
+        clean_depth_pub.publish(convert2ROSMsg(cleaned_depth, cv_br)); // publish topic
         
+        // comment two lines below if using for next step that don't need for visualize 
+        showOnScreen(depth_raw, "raw");
         showOnScreen(cleaned_depth, "cleaned");
 
         rate.sleep();
