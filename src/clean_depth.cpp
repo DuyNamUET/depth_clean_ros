@@ -2,8 +2,6 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 
-// #include <librealsense2/rs.hpp> // include RealSense Cross Platform API
-
 #include <opencv2/opencv.hpp>   // include OpenCV API
 #include <opencv2/rgbd.hpp>     // openCV RGBD Contrib package
 #include <opencv2/highgui/highgui_c.h> // openCV High-level GUI
