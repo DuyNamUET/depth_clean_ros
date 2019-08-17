@@ -1,5 +1,5 @@
 # Depth Cleaned Realsense using ROS and OpenCV
-![Clean Depth ROS](image/cleaned_depth.png)
+![Clean Depth ROS](image/depth_clean.png)
 *Left: cleaned depth map; Right: raw depth map*
 
 Using Intel RealSense Camera D435. This ROS node clean depth map using OpenCV.

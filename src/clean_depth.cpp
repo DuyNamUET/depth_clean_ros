@@ -18,6 +18,7 @@ void showOnScreen(const Mat& img_16uc1, const char name[])
     Mat show_img = Mat(img_16uc1.size(), CV_8U);
 
     img_16uc1.convertTo(show_img, CV_8U, (float)255/65535);
+    convertScaleAbs(show_img, show_img, 8.0);
     applyColorMap(show_img, show_img, COLORMAP_JET);
     imshow(name, show_img);
     waitKey(1);
