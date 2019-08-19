@@ -78,7 +78,7 @@ int main(int argc, char**argv)
         }
 
         // run cleaner instance
-        depthc->operator()(depth_raw, cleaned_depth); // Here  
+        depthc->operator()(depth_raw, cleaned_depth);
 
         const unsigned char no_depth = 0;
         Mat temp, temp2;
