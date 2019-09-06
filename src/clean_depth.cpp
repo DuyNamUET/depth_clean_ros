@@ -7,7 +7,7 @@
 #include <opencv2/highgui/highgui_c.h> // openCV High-level GUI
 
 #define SCALE_FACTOR 1
-
+#include <iostream>
 using namespace cv;
 
 cv_bridge::CvImage cv_br;
@@ -49,19 +49,40 @@ sensor_msgs::Image convert2ROSMsg(const Mat& depth_input, const cv_bridge::CvIma
     return msg;
 }
 
+void cleanDepth(Mat& clean_depth)
+{
+    Mat input_depth = Mat(clean_depth.size(), CV_8U);
+    clean_depth.convertTo(input_depth, CV_8U, 255.0/65535);
+    const unsigned char no_depth = 0;
+    Mat temp, temp2;
+    Mat small_depthf;
+
+    resize(input_depth, small_depthf, input_depth.size(),
+            SCALE_FACTOR, SCALE_FACTOR); 
+
+    // inpaint only the masked "unknown" pixels
+    // input inpaint function is CV_8U type
+    inpaint(small_depthf, (small_depthf == no_depth), temp, 5.0, INPAINT_TELEA);
+
+    resize(temp, temp2, temp.size());
+    temp2.copyTo(input_depth, (input_depth == no_depth));
+    input_depth.convertTo(clean_depth, CV_16U, 65535.0/255);
+    return;
+}
+
 int main(int argc, char**argv)
 {
     ros::init(argc, argv, "clean_depth");
     ros::NodeHandle nh;
 
     ros::Subscriber aligned_depth_sub = nh.subscribe
-            ("/camera/aligned_depth_to_color/image_raw", 30, alignedDepthCallback);
+            ("/camera/aligned_depth_to_color/image_raw", 15, alignedDepthCallback);
     ros::Publisher clean_depth_pub = nh.advertise
-            <sensor_msgs::Image>("/clean_depth", 30);
-    //Create a depth cleaner instance
+            <sensor_msgs::Image>("/clean_depth", 15);
+    // Create a depth cleaner instance
     rgbd::DepthCleaner* depthc = new rgbd::DepthCleaner
             (CV_16U, 7, rgbd::DepthCleaner::DEPTH_CLEANER_NIL); 
-    
+    // ros::spin();
     ros::Rate rate(30);
     while(nh.ok())
     {
@@ -80,18 +101,8 @@ int main(int argc, char**argv)
         // run cleaner instance
         depthc->operator()(depth_raw, cleaned_depth);
 
-        const unsigned char no_depth = 0;
-        Mat temp, temp2;
-        Mat small_depthf;
-
-        resize(cleaned_depth, small_depthf, cleaned_depth.size(),
-                SCALE_FACTOR, SCALE_FACTOR); 
-
-        // inpaint only the masked "unknown" pixels
-        inpaint(small_depthf, (small_depthf == no_depth), temp, 5.0, INPAINT_TELEA);
-
-        resize(temp, temp2, temp.size());
-        temp2.copyTo(cleaned_depth, (cleaned_depth == no_depth));
+        //clean depth map
+        cleanDepth(cleaned_depth);
 
         clean_depth_pub.publish(convert2ROSMsg(cleaned_depth, cv_br)); // publish topic
         
